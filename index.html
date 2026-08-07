@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ranking pages by missed clicks — a position-adjusted CTR opportunity score</title>
+<meta name="description" content="A decision-support ranking for search content review, built on 70,075 pages of pseudonymized search data. The transparent rule beat the learned model.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,300;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12151a;
+    --paper:#fcfcfa;
+    --rule:#dcdee2;
+    --rule-soft:#ebecee;
+    --muted:#5c6470;
+    --steel:#3f6e9b;
+    --amber:#c9761a;
+    --steel-wash:#eef3f8;
+    --amber-wash:#faf2e8;
+    --measure:34rem;
+  }
+
+  *{box-sizing:border-box}
+
+  html{-webkit-text-size-adjust:100%}
+
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Newsreader",Georgia,serif;
+    font-size:1.0625rem;
+    line-height:1.62;
+    font-weight:400;
+  }
+
+  .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .wrap{
+    max-width:60rem;
+    margin:0 auto;
+    padding:0 1.5rem 6rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead{
+    padding:4.5rem 0 2.25rem;
+    border-bottom:1px solid var(--ink);
+  }
+
+  .eyebrow{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.6875rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 1.75rem;
+  }
+
+  h1{
+    font-size:clamp(2.1rem,5.2vw,3.4rem);
+    line-height:1.08;
+    font-weight:500;
+    letter-spacing:-.018em;
+    margin:0 0 1.25rem;
+    max-width:22ch;
+  }
+
+  .standfirst{
+    font-size:1.1875rem;
+    line-height:1.55;
+    color:var(--muted);
+    max-width:var(--measure);
+    margin:0 0 2.5rem;
+    font-weight:300;
+  }
+
+  .byline{
+    display:flex;
+    flex-wrap:wrap;
+    gap:.5rem 1.75rem;
+    font-family:"JetBrains Mono",monospace;
+    font-size:.75rem;
+    color:var(--muted);
+  }
+
+  .byline strong{color:var(--ink);font-weight:500}
+
+  /* ---------- sections ---------- */
+
+  section{
+    display:grid;
+    grid-template-columns:4.5rem minmax(0,1fr);
+    gap:0 2.5rem;
+    padding:3.25rem 0;
+    border-bottom:1px solid var(--rule-soft);
+  }
+
+  .snum{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.75rem;
+    color:var(--muted);
+    padding-top:.55rem;
+    border-top:2px solid var(--ink);
+    align-self:start;
+    position:sticky;
+    top:1.5rem;
+  }
+
+  .body{max-width:var(--measure)}
+  .body.wide{max-width:none}
+
+  h2{
+    font-size:1.6rem;
+    font-weight:500;
+    letter-spacing:-.012em;
+    line-height:1.2;
+    margin:0 0 1.25rem;
+  }
+
+  h3{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.75rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    font-weight:500;
+    color:var(--muted);
+    margin:2.5rem 0 .875rem;
+  }
+
+  p{margin:0 0 1.1rem}
+  p:last-child{margin-bottom:0}
+
+  a{color:var(--steel);text-decoration:underline;text-underline-offset:.16em;text-decoration-thickness:.5px}
+  a:hover{text-decoration-thickness:1.5px}
+  a:focus-visible{outline:2px solid var(--steel);outline-offset:3px;border-radius:2px}
+
+  code{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.8125em;
+    background:var(--rule-soft);
+    padding:.12em .38em;
+    border-radius:2px;
+  }
+
+  ul{margin:0 0 1.1rem;padding-left:1.15rem}
+  li{margin-bottom:.5rem}
+  li::marker{color:var(--muted)}
+
+  /* ---------- the position ladder (signature) ---------- */
+
+  .ladder{
+    margin:2.25rem 0;
+    border-top:1px solid var(--ink);
+    border-bottom:1px solid var(--rule);
+  }
+
+  .ladder-head{
+    display:grid;
+    grid-template-columns:5.5rem 1fr 5.5rem;
+    gap:1rem;
+    font-family:"JetBrains Mono",monospace;
+    font-size:.625rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    padding:.65rem 0;
+    border-bottom:1px solid var(--rule-soft);
+  }
+
+  .ladder-head span:last-child{text-align:right}
+
+  .rung{
+    display:grid;
+    grid-template-columns:5.5rem 1fr 5.5rem;
+    gap:1rem;
+    align-items:center;
+    padding:.9rem 0;
+    border-bottom:1px solid var(--rule-soft);
+  }
+
+  .rung:last-child{border-bottom:none}
+
+  .rung-label{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.8125rem;
+    font-weight:500;
+  }
+
+  .rung-label small{
+    display:block;
+    font-size:.625rem;
+    font-weight:400;
+    color:var(--muted);
+    letter-spacing:.04em;
+    margin-top:.15rem;
+  }
+
+  .bar{
+    height:.5rem;
+    background:var(--steel);
+    border-radius:1px;
+    transform-origin:left;
+  }
+
+  .rung-zero{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.8125rem;
+    text-align:right;
+    color:var(--amber);
+    font-weight:500;
+  }
+
+  .ladder-note{
+    font-size:.875rem;
+    color:var(--muted);
+    margin:.9rem 0 0;
+    line-height:1.5;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tablewrap{overflow-x:auto;margin:1.75rem 0}
+
+  table{
+    border-collapse:collapse;
+    width:100%;
+    font-family:"JetBrains Mono",monospace;
+    font-size:.8125rem;
+    min-width:26rem;
+  }
+
+  caption{
+    text-align:left;
+    font-family:"JetBrains Mono",monospace;
+    font-size:.6875rem;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    color:var(--muted);
+    padding-bottom:.7rem;
+  }
+
+  th,td{
+    padding:.5rem .75rem;
+    text-align:right;
+    border-bottom:1px solid var(--rule-soft);
+    white-space:nowrap;
+  }
+
+  th:first-child,td:first-child{text-align:left;padding-left:0}
+  th:last-child,td:last-child{padding-right:0}
+
+  thead th{
+    border-bottom:1px solid var(--ink);
+    font-weight:500;
+    color:var(--muted);
+    font-size:.6875rem;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+
+  tbody tr:last-child td{border-bottom:none}
+
+  .win{color:var(--steel);font-weight:700}
+  .lose{color:var(--muted)}
+  .flag{color:var(--amber);font-weight:700}
+
+  /* ---------- pull statement ---------- */
+
+  .verdict{
+    margin:2.25rem 0;
+    padding:1.5rem 0 1.5rem 1.5rem;
+    border-left:3px solid var(--amber);
+    background:var(--amber-wash);
+    padding-right:1.5rem;
+  }
+
+  .verdict p{
+    font-size:1.1875rem;
+    line-height:1.45;
+    margin:0;
+    font-weight:400;
+  }
+
+  /* ---------- figures ---------- */
+
+  figure{margin:2.25rem 0}
+
+  figure img{
+    width:100%;
+    height:auto;
+    display:block;
+    border:1px solid var(--rule);
+    background:#fff;
+  }
+
+  figcaption{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.6875rem;
+    line-height:1.55;
+    color:var(--muted);
+    margin-top:.7rem;
+  }
+
+  /* ---------- queue rows ---------- */
+
+  .queue{margin:1.75rem 0;border-top:1px solid var(--ink)}
+
+  .qrow{
+    display:grid;
+    grid-template-columns:2.25rem 1fr auto;
+    gap:1rem;
+    align-items:baseline;
+    padding:.85rem 0;
+    border-bottom:1px solid var(--rule-soft);
+  }
+
+  .qrank{font-family:"JetBrains Mono",monospace;font-size:.75rem;color:var(--muted)}
+  .qtext{font-size:.9375rem;line-height:1.45}
+
+  .tag{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.625rem;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    padding:.2rem .5rem;
+    border-radius:2px;
+    white-space:nowrap;
+  }
+
+  .tag-high{background:var(--steel-wash);color:var(--steel)}
+  .tag-verify{background:var(--amber-wash);color:var(--amber)}
+
+  /* ---------- footer ---------- */
+
+  footer{
+    padding:3rem 0 0;
+    border-top:1px solid var(--ink);
+    font-size:.9375rem;
+    color:var(--muted);
+  }
+
+  footer p{max-width:var(--measure)}
+
+  .credit{
+    font-family:"JetBrains Mono",monospace;
+    font-size:.75rem;
+    line-height:1.7;
+    margin-top:2rem;
+  }
+
+  /* ---------- motion ---------- */
+
+  @media (prefers-reduced-motion:no-preference){
+    .bar{animation:grow .85s cubic-bezier(.2,.7,.3,1) both}
+    .rung:nth-child(2) .bar{animation-delay:.1s}
+    .rung:nth-child(3) .bar{animation-delay:.2s}
+    .rung:nth-child(4) .bar{animation-delay:.3s}
+    @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  }
+
+  /* ---------- responsive ---------- */
+
+  @media (max-width:44rem){
+    section{grid-template-columns:1fr;gap:0}
+    .snum{position:static;border-top:none;padding-top:0;margin-bottom:.9rem}
+    .masthead{padding-top:3rem}
+    .ladder-head,.rung{grid-template-columns:4.5rem 1fr 3.5rem;gap:.65rem}
+    .qrow{grid-template-columns:2rem 1fr;gap:.65rem}
+    .qrow .tag{grid-column:2;justify-self:start;margin-top:.35rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">FlyRank ML Internship &middot; Machine Learning track &middot; Applied Search Intelligence</p>
+    <h1>Ranking pages by the clicks they missed</h1>
+    <p class="standfirst">A position-adjusted opportunity score for search content review, built on 70,075 pages of pseudonymized search data — and the learned model that lost to it.</p>
+    <div class="byline">
+      <span><strong>Ayush Khatri</strong></span>
+      <span>Lane 4 &middot; CTR / Engagement Opportunity Scoring</span>
+      <span>Warehouse release v20260703</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="snum">Abstract</div>
+    <div class="body">
+      <h2>What this asks, how it was tested, what came back</h2>
+      <p>A content team can review perhaps fifty pages a week out of tens of thousands, and the obvious way to choose them — sort by click-through rate and take the worst — mostly returns pages that rank low in search rather than pages that underperform. I built a transparent rule that compares each page only against pages at a similar search position and scores it by estimated missed clicks, then trained a gradient-boosted model to predict expected clicks and rank pages by the residual instead. Both were validated the same way: features from March 2026, whole clients held out of training, and rankings scored against an outcome observed in April 2026 that neither could see. The rule reached precision@50 of 0.86 against the model's 0.68, and it also won on a second metric built specifically so it could not favour the rule by construction. The more useful finding is one both share: neither surfaces a single page from search positions 11–20, which is exactly where 43% of pages received no clicks at all.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">01</div>
+    <div class="body">
+      <h2>The decision this supports</h2>
+      <p>Which visible pages are showing up in search but not getting as many clicks as they should?</p>
+      <p>Behind that question is a scheduling problem. A content team cannot review every page. Each week they can open a limited number — say fifty — and the decision is which fifty. A reviewer opens each page from the list, checks the title and meta description against what the page actually offers, and rewrites them if there is a clear mismatch.</p>
+      <p>The obvious answer is to sort by click-through rate and start at the bottom. That does not work, because position determines most of the click-through rate before content has any say in it.</p>
+
+      <div class="ladder" role="figure" aria-label="Median click-through rate and zero-click share by search position tier, from 70,075 pages">
+        <div class="ladder-head">
+          <span>Position</span>
+          <span>Median CTR</span>
+          <span>No clicks</span>
+        </div>
+        <div class="rung">
+          <div class="rung-label">1&ndash;3<small>n = 8,162</small></div>
+          <div><div class="bar" style="width:100%"></div></div>
+          <div class="rung-zero">21.6%</div>
+        </div>
+        <div class="rung">
+          <div class="rung-label">4&ndash;10<small>n = 43,764</small></div>
+          <div><div class="bar" style="width:86.7%"></div></div>
+          <div class="rung-zero">27.8%</div>
+        </div>
+        <div class="rung">
+          <div class="rung-label">11&ndash;20<small>n = 18,149</small></div>
+          <div><div class="bar" style="width:44.5%"></div></div>
+          <div class="rung-zero">43.2%</div>
+        </div>
+      </div>
+      <p class="ladder-note">Bars are median CTR relative to the top tier (0.211%, 0.183%, 0.094%). The right column is the share of pages that received zero clicks despite at least 100 impressions.</p>
+
+      <p>Click-through rate falls with position and the share of pages that got nothing at all climbs from 22% to 43%. So a list sorted by raw CTR is close to a list sorted by position. Comparing a page against pages at a similar position is meaningful; comparing it against the whole inventory is not.</p>
+      <p>A wrong call costs twice. A reviewer edits a page that was fine, and a page that needed attention stays broken for another week. Since reviewers only get through the top of the list, a wrong page near the top is expensive — which is why this work is measured by precision at the top of the ranking rather than by accuracy across all 70,075 pages.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">02</div>
+    <div class="body">
+      <h2>Data</h2>
+      <p>The FlyRank internship warehouse release, build id <code>flyrank_pseudonymized_warehouse_release_v20260703</code>. It is gated, pseudonymized, and ships observable signals only — no client names, domains, URLs, or queries appear in it, or anywhere in this work.</p>
+      <p>Two tables: <code>fact_content_daily_performance</code> for daily search signals, and <code>dim_content</code> joined on <code>content_hash_id</code> for page metadata.</p>
+
+      <h3>Windows</h3>
+      <p>March 2026 for features, April 2026 for evaluation only. A mid-panel month, because the panel is unbalanced — clients begin tracking at different dates, so a middle month has more clients with real history than either end. June 2026 is the final month and the natural outcome window for any past-to-future label, so it stays sealed. That also rules out the <code>_sample</code> table, which is exactly June.</p>
+
+      <h3>Grain</h3>
+      <p>The daily table records one row per page per client per day. That is not the decision grain — a reviewer acts on a page, not a page-day — so the daily rows are aggregated to one row per client-page over the month. The collapse was verified rather than assumed: 9,841,378 daily rows and 9,841,378 distinct date-client-content keys, reducing to 331,437 client-pages. After filtering to pages with at least 100 impressions, an average position between 1 and 20, and a creation date before the window opened: <strong>70,075 pages across 38 clients</strong>.</p>
+
+      <h3>Excluded, and why</h3>
+      <ul>
+        <li><strong>Staleness.</strong> 56,874 of 70,075 values of <code>days_since_update</code> fall <em>after</em> the window start, and one single value is shared by 12,734 pages. That reads as a bulk sync stamp rather than an edit history. Using it would have put future information into a rule that has to work at the decision moment.</li>
+        <li><strong>Query-mix features.</strong> <code>fact_content_query_90d</code> is computed over a fixed 90-day window I do not control, and it overlaps any target window I define.</li>
+        <li><strong>AI referral columns.</strong> 30,177 rows carry AI sessions across a 78.8-million-row table. Too sparse to be stable at this grain.</li>
+        <li><strong>Clicks as a feature.</strong> CTR is clicks over impressions and impressions is already a feature, so clicks is half the label. Adding it during an earlier check moved R&sup2; from 0.012 to 0.993 — not skill, arithmetic.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">03</div>
+    <div class="body">
+      <h2>Methodology</h2>
+
+      <h3>The rule</h3>
+      <p>For every page with enough exposure, compare its CTR against the median CTR of pages in its own position tier. If it sits below, estimate the clicks it plausibly missed:</p>
+      <p><code>estimated_missed_clicks = impressions &times; (tier_median_ctr &minus; ctr) / 100</code>, floored at zero.</p>
+      <p>Multiplying by impressions is deliberate. An earlier version ranked on the raw CTR gap and put all fifty top pages in a single tier, because an absolute difference from a tier median favours whichever tier has the highest median. Scoring in estimated clicks corrects that direction and puts the score in a unit a reviewer understands.</p>
+
+      <h3>The model</h3>
+      <p>A gradient-boosted regressor with Poisson loss, predicting clicks from five knowable signals: impression-weighted average position, impressions, content age at the window start, content type, and main intent. Predicted clicks become an expected CTR, and pages are ranked by how far their actual CTR falls below it. Poisson rather than ordinary least squares because the target is a count and over a quarter of pages have exactly zero clicks.</p>
+
+      <h3>Validation</h3>
+      <p>Whole clients are held out, not random rows. One client holds a large share of the slice, so a random split would let the same client sit on both sides and let a model score well by learning that client's habits. The split leaves 25 clients and 37,478 pages for training, 12 clients and 18,447 pages for testing.</p>
+
+      <h3>The outcome, and why it is observed rather than defined</h3>
+      <p>Rankings are built on March and scored against April: was the page still below its position tier's median CTR in the following month? Of March pages below their tier median, 74.7% were still below it in April, against a base rate of 51.6% — so this is a persistent property rather than month-to-month noise. April data enters the evaluation only. It is never a feature.</p>
+
+      <h3>Leakage checks</h3>
+      <p>Every input is a measurement taken during the feature window: impressions summed over it, position impression-weighted over it, tier medians computed from the same pages in the same month. No FlyRank product flag is used — none ships in this release by design. An assertion in the notebook confirms no future-dated column reached the exported queue.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">04</div>
+    <div class="body wide">
+      <h2>Results</h2>
+      <p style="max-width:var(--measure)">Three rankers, the same twelve held-out clients, the same observed April outcome. Carry-forward is the cheapest possible ranker — it simply flags whatever was below its tier median in March — and it is included to show what the comparison is worth.</p>
+
+      <div class="tablewrap">
+        <table>
+          <caption>Precision@K on the April outcome &mdash; base rate 0.563</caption>
+          <thead>
+            <tr><th>K</th><th>Carry-forward</th><th>Baseline rule</th><th>Model</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>20</td><td>0.900</td><td>0.850</td><td class="lose">0.600</td></tr>
+            <tr><td>50</td><td>0.740</td><td class="win">0.860</td><td class="lose">0.680</td></tr>
+            <tr><td>100</td><td>0.720</td><td class="win">0.910</td><td class="lose">0.740</td></tr>
+            <tr><td>500</td><td>0.734</td><td class="win">0.932</td><td class="lose">0.812</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="max-width:var(--measure)">I expected that metric to favour the rule. The label asks whether a page was below its tier median in April; the rule scores how far below its tier median it was in March. Those are the same quantity a month apart. So I built a second metric that never touches a tier median — it asks only what click-through rate the top-ranked pages actually had in April.</p>
+
+      <div class="tablewrap">
+        <table>
+          <caption>Mean April CTR of the top-K &mdash; lower is better &mdash; test-set mean 0.234</caption>
+          <thead>
+            <tr><th>K</th><th>Carry-forward</th><th>Baseline rule</th><th>Model</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>20</td><td class="win">0.063</td><td>0.086</td><td class="lose">0.165</td></tr>
+            <tr><td>50</td><td>0.092</td><td class="win">0.071</td><td class="lose">0.158</td></tr>
+            <tr><td>100</td><td>0.093</td><td class="win">0.061</td><td class="lose">0.132</td></tr>
+            <tr><td>500</td><td>0.102</td><td class="win">0.068</td><td class="lose">0.109</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="max-width:var(--measure)">Spearman correlation with April CTR, where more negative means a better ranking: carry-forward &minus;0.399, baseline &minus;0.361, model &minus;0.276.</p>
+
+      <div class="verdict">
+        <p>The model lost on both metrics. Removing the rule's structural advantage did not change the outcome — on this slice, the transparent rule ranks better than the learned one.</p>
+      </div>
+
+      <p style="max-width:var(--measure)">The reason traces back to an earlier check. The model's job is to predict expected clicks from five features, and those features explained almost none of the variation in click-through rate — R&sup2; of 0.012 on a held-out split. A residual is only as good as the prediction it is measured against, so a weak predictor yields a noisy residual. Layering a model on top of a poor expectation made the ranking worse, not better.</p>
+
+      <figure>
+        <img src="work/outputs/charts/model_vs_baseline.png" alt="Two line charts. Left: precision at K for carry-forward, baseline rule and model against the April outcome, with the baseline highest at K of 50 and above. Right: mean April click-through rate of the top K pages, where the baseline rule sits lowest and the model highest.">
+        <figcaption>Left: precision@K against the April outcome. Right: the neutral check — what the top-ranked pages actually did the following month, with no tier median in the metric. The baseline rule leads on both.</figcaption>
+      </figure>
+
+      <h3>Carry-forward is not really a third ranker</h3>
+      <p style="max-width:var(--measure)">It looks strongest at K=20, but its score is binary, so thousands of pages tie at 1 and its top twenty is an arbitrary slice of that tie group — which is why its numbers move between runs while the rule's do not. Its top twenty also contains 65% pages with zero April clicks, against 5% for the rule. It finds low-volume pages that underperform truly but trivially. A page with 200 impressions is not worth a reviewer's hour.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">05</div>
+    <div class="body">
+      <h2>Limitations</h2>
+
+      <h3>The blind spot both rankers share</h3>
+      <p>Tier 11&ndash;20 holds 18,149 pages in March and 43% of them received zero clicks — the worst outcomes in the slice. Neither the rule nor the model places a single one of them in the top fifty.</p>
+      <p>This is structural, not incidental. Both multiply a shortfall by impressions, and tier 11&ndash;20 is smaller on both terms: its median CTR is 0.094, so the largest shortfall a page there can have is 0.094 against 0.211 for the top tier, and its median impressions are 581 against 1,849. Two smaller numbers multiplied together mean deep-ranked pages essentially cannot outscore shallow ones, however badly they underperform their peers.</p>
+      <p>The model inherited the bias rather than fixing it, which locates the problem in the scoring shape rather than the choice of estimator. Two testable alternatives: score the shortfall as a fraction of the tier median so tiers compete evenly, or keep the click-based score and rank within tier rather than globally.</p>
+
+      <figure>
+        <img src="work/outputs/charts/signal_and_bias.png" alt="Two bar charts. Left: median click-through rate by position tier with an overlaid line showing the rising share of pages with zero clicks. Right: the position tier mix of the top fifty pages for the baseline and the model, with no bar at all for tier 11 to 20.">
+        <figcaption>Left: the premise — CTR falls with position while the zero-click share rises. Right: the blind spot — neither ranker's top fifty contains a page from tier 11&ndash;20.</figcaption>
+      </figure>
+
+      <h3>The availability flag carries no extra information</h3>
+      <p>In March, exactly 3,611,061 rows have <code>gsc_data_available IS TRUE</code> and exactly 3,611,061 have impressions above zero. The counts are identical, so a page that was tracked and served nothing cannot be separated from a page that was never tracked. For the remaining 63% of daily rows, the reason for the absence is unknown.</p>
+
+      <h3>Run-to-run variation</h3>
+      <p>The model's precision@50 came out at 0.680 and 0.720 across two runs of identical code with a fixed seed — about two pages in fifty. The rule's figures are identical across runs. The model's numbers should be read as approximate.</p>
+
+      <h3>Scope</h3>
+      <p>One month, one slice: 38 clients and 70,075 pages after filtering, with held-out evaluation on 12 clients. Nothing here has been tested at full warehouse scale or across seasons.</p>
+
+      <h3>What this work can never say</h3>
+      <p>That editing a page causes clicks to change. This is observational data: impressions, clicks and position measured after the fact, never the ranking system, the results page, or the person doing the searching. Even a perfect ranking here is decision-support — pages worth a reviewer's time, in an order. It is not a causal claim, and it is not a statement about how any search engine ranks anything.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">06</div>
+    <div class="body">
+      <h2>Ranked recommendations</h2>
+      <p>The playbook ships the rule, not the model. That is the honest consequence of the results — and the rule is also the one a reviewer can read and argue with.</p>
+      <p>Every row carries a score in estimated missed clicks, one reason code (<code>below_tier_ctr</code>), one action (<code>review_title_and_meta</code>), and a confidence label. Of the top hundred, 88 are high confidence and 12 are flagged for verification first.</p>
+
+      <div class="queue">
+        <div class="qrow">
+          <div class="qrank">01</div>
+          <div class="qtext">Position 3.2, 143,019 impressions, CTR 0.030 against a tier median of 0.183 — an estimated 219 missed clicks.</div>
+          <div><span class="tag tag-high">High</span></div>
+        </div>
+        <div class="qrow">
+          <div class="qrank">02</div>
+          <div class="qtext">Position 9.7, 107,584 impressions, CTR 0.014 — real exposure, real gap, plausibly fixable.</div>
+          <div><span class="tag tag-high">High</span></div>
+        </div>
+        <div class="qrow">
+          <div class="qrank">06</div>
+          <div class="qtext">Position 8.7, 63,201 impressions, CTR 0.003 — near-zero clicks at heavy exposure. Check the measurement before editing.</div>
+          <div><span class="tag tag-verify">Verify first</span></div>
+        </div>
+      </div>
+
+      <h3>Why the verify-first label exists</h3>
+      <p>A hand review of the top twenty found seven pages with near-zero CTR at very high exposure. One sat at position 1.4 with 44,707 impressions and no clicks at all. A page ranking that high with nothing to show for it is unlikely to have a title problem — a tracking gap or a results-page feature answering the query in place is a better explanation. Those pages no longer receive high confidence; they are marked for verification, because the ranking surfaces the largest gap and the largest gap is sometimes the most broken measurement rather than the most fixable page.</p>
+
+      <h3>How to work the queue</h3>
+      <ul>
+        <li>Work top-down. The ordering carries the information; the flag does not — the rule flags exactly half the pool, which is what a median does.</li>
+        <li>Start with high-confidence rows: real gap, real volume, plausibly fixable.</li>
+        <li>For verify-first rows, check the measurement before editing anything.</li>
+        <li>Stop when the week's capacity runs out. Fifty was chosen as the evaluation cut because fifty is a plausible weekly load — the metric matches the decision.</li>
+      </ul>
+
+      <h3>What would make a recommendation wrong</h3>
+      <p>The query behind a page may simply not match what the page offers, which no metadata edit fixes. Pages already at positions 1&ndash;3 have a low ceiling even when a rewrite works. And the queue cannot see tier 11&ndash;20 at all.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="snum">07</div>
+    <div class="body">
+      <h2>Reproducibility</h2>
+      <p>Every notebook runs top to bottom from the repository, reading the warehouse over <code>hf://</code> with DuckDB — no local download, no credentials in code. The two figures above are written by the capstone notebook, and the run's metrics are committed as JSON alongside them.</p>
+      <ul>
+        <li><code>work/notebooks/w01_research_question.ipynb</code> — lane choice and framing</li>
+        <li><code>work/notebooks/w02_ml_task_framing.ipynb</code> — task type, target, metric</li>
+        <li><code>work/notebooks/w03_data_contract.ipynb</code> — grain, windows, exclusions, the deliberate leak</li>
+        <li><code>work/notebooks/w04_baseline_score.ipynb</code> — signal checks and the rule</li>
+        <li><code>work/notebooks/capstone.ipynb</code> — model, validation, results</li>
+      </ul>
+      <p>The ranked queue itself is regenerated on every run rather than committed — the repository's leak guard keeps data files out of version control by design.</p>
+      <p><a href="https://github.com/AyushKhatri-Dev/flyrank-search-intelligence">github.com/AyushKhatri-Dev/flyrank-search-intelligence</a></p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Written as the capstone for the FlyRank ML Internship, Machine Learning track, Applied Search Intelligence.</p>
+    <p class="credit">
+      Built on the FlyRank ML Internship dataset &mdash; <a href="https://flyrank.ai">flyrank.ai</a><br>
+      Release <span class="mono">flyrank_pseudonymized_warehouse_release_v20260703</span><br>
+      All identifiers pseudonymized at source. No client names, domains, URLs or queries appear in this work.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
